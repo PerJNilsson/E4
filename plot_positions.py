@@ -4,7 +4,8 @@
 # imports
 import matplotlib.pylab as plt
 import numpy as np
-
+import matplotlib.mlab as mlab
+import math
 # input file
 filename = 'pos.dat'
 
@@ -29,7 +30,7 @@ plt.ylabel('Positions / [nm]', fontsize=20)
 plt.legend(loc='upper right')
 leg = plt.gca().get_legend()
 ltext  = leg.get_texts()
-plt.setp(ltext, fontsize=12) 
+plt.setp(ltext, fontsize=12)
 
 # axis limits
 # tick fontsize
@@ -38,6 +39,5 @@ plt.yticks(fontsize=12)
 plt.title('Position of '+str(cols-4)+ ' molecules, $\mu$ and $\mu \pm \sigma$')
 
 # display the plot
-
 
 plt.show()

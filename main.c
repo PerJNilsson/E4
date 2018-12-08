@@ -19,6 +19,15 @@ int main() {
 
 
   srand(time(NULL));
+  // GSL INITIALIZATION
+	const gsl_rng_type *T;
+	gsl_rng *q;
+  // Initializations
+  gsl_rng_env_setup();
+	T = gsl_rng_default;
+	q = gsl_rng_alloc(T);
+	gsl_rng_set(q,time(NULL));
+
   // Declaring variables
   int nbr_of_simulations;
   double v_th, m, temperature, k_b, c_0, eta;
@@ -34,24 +43,38 @@ int main() {
   int avg_loops;
   double start_v;
   double start_x;
-
+  double tmp_v;
+  double tmp_a;
+  double tmp_x;
+  
   // Initializing variable
-  nbr_of_simulations = 25000;
+  nbr_of_simulations = 30000;
   timestep = 5*1E-8; // 1e5 and 500 simulations is good for v
   nbr_of_particles = 5;
-  avg_loops = 100000;
+  avg_loops = 1000;
   radius = (2.79*1E-6)/2.0;
   density = 2.65 * 1E3;
   m = 4.0*M_PI*radius*radius*radius *density*3.0; // assuming particle is sphere-ish
+  printf("mass of particle=%.15f\n",m);
   temperature = 297;
-  tau = 147.3*1E-6; // 48.5 | 147.3;
+  tau = 48.5*1E-6; // 48.5 | 147.3;
+  tau = 147.3*1E-6;
   eta = 1.0/tau;
-  c_0 = exp(-2*eta*timestep);
+  c_0 = exp(-eta*timestep);
   k_b = 1.380*1E-23;
-  omega_0 = 3000;
+  omega_0 = 3000.0;
   v_th = sqrt(k_b*temperature / m);
   start_v = 2*1E-3;
   start_x = 1*1E-7;
+  counter1=0;
+  counter2=0;
+  counter3=0;
+  counter4=0;
+
+  FILE * scale;
+  scale = fopen("scale.dat", "w");
+  fprintf(scale, "%f", timestep*1E3);
+  fclose(scale);
 
   // Allocation space to save variables heap and stack
   double ** x_pos = malloc(sizeof(double)*(nbr_of_simulations));
@@ -84,17 +107,26 @@ int main() {
     v[k] =  start_v;
     a[k] = get_acc(omega_0, x[k]);
   }
-
+  double uni_var1, uni_var2;
   // Loop to write a few tradjectories to disk
   for (int i=1; i<nbr_of_simulations; i++){
 
     for (int j=0; j<nbr_of_particles; j++){
-      gaussian_nbr(gauss_rv);
+      //gaussian_nbr(gauss_rv);
 
-      v[j] = 0.5*a[j]*timestep + sqrt(c_0)*v[j] + v_th*sqrt(1.0-c_0)*gauss_rv[0];
+      uni_var1 = gsl_rng_uniform(q);
+      uni_var2 = gsl_rng_uniform(q);
+
+      // Using Box-Muller
+      gauss_rv[0]  = sqrt( -2.0*log(uni_var1))*cos(M_PI*2*uni_var2);
+      gauss_rv[1]  = sqrt( -2.0*log(uni_var1))*sin(M_PI*2*uni_var2);
+
+      v[j] = sqrt(c_0)*v[j] + v_th*sqrt(1.0-c_0)*gauss_rv[0];
+      v[j] = v[j] + 0.5*a[j]*timestep;
       x[j] = x[j] + v[j]*timestep;
       a[j] = get_acc(omega_0, x[j]);
-      v[j] = 0.5*a[j]*timestep +  sqrt(c_0)*v[j] + v_th*sqrt(1.0-c_0)*gauss_rv[1];
+      v[j] = v[j] + 0.5*a[j]*timestep;
+      v[j] = sqrt(c_0)*v[j] + v_th*sqrt(1.0-c_0)*gauss_rv[1];
 
       x_pos[i][j] = x[j];
       v_particles[i][j] = v[j];
@@ -102,24 +134,33 @@ int main() {
   }
 
   // Loop to calculate average over several trajectories
-  double tmp_v;  double tmp_a; double tmp_x;
-  counter1=0; counter2=0; counter3=0; counter4=0;
   for (int j=0; j<avg_loops; j++){
     tmp_v = start_v;
     tmp_x = start_x;
     tmp_a = get_acc(omega_0, tmp_x);
+
     v_mean[0] += tmp_v/avg_loops;
     v_variance[0] += tmp_v*tmp_v/avg_loops;
+
     x_mean[0] += tmp_x / avg_loops;
     x_variance[0] += tmp_x*tmp_x / avg_loops;
+
     for (int i=1; i<nbr_of_simulations; i++){
 
-      gaussian_nbr(gauss_rv);
+      // Get two uniform random numbers [0,1]
+      uni_var1 = gsl_rng_uniform(q);
+      uni_var2 = gsl_rng_uniform(q);
 
-      tmp_v = 0.5*tmp_a*timestep + sqrt(c_0)*tmp_v + v_th*sqrt(1.0-c_0)*gauss_rv[0];
+      // Using Box-Muller to get 2 gaussian r.v. from unifrom r.v.
+      gauss_rv[0]  = sqrt( -2.0*log(uni_var1))*cos(M_PI*2*uni_var2);
+      gauss_rv[1]  = sqrt( -2.0*log(uni_var1))*sin(M_PI*2*uni_var2);
+
+      tmp_v =  sqrt(c_0)*tmp_v + v_th*sqrt(1.0-c_0)*gauss_rv[0];
+      tmp_v = tmp_v + 0.5*tmp_a*timestep;
       tmp_x = tmp_x + tmp_v*timestep;
       tmp_a = get_acc(omega_0, tmp_x);
-      tmp_v = 0.5*tmp_a*timestep +  sqrt(c_0)*tmp_v + v_th*sqrt(1.0-c_0)*gauss_rv[1];
+      tmp_v = tmp_v + 0.5*tmp_a*timestep;
+      tmp_v = sqrt(c_0)*tmp_v + v_th*sqrt(1.0-c_0)*gauss_rv[1];
 
       get_histogram_values(j, i,tmp_v, tmp_x);
 
@@ -194,7 +235,7 @@ void save_v_to_disk(double ** v_particles, int nbr_of_simulations, FILE * veloci
 }
 
 void get_histogram_values(int j, int i, double tmp_v, double tmp_x){
-  int t_sample[4] = {10, 500, 3000, 20000};
+  int t_sample[4] = {1000, 2000, 5000, 20000};
   double ms = 1E3;
   double nm = 1E9;
   if (i == t_sample[0]) {

@@ -10,7 +10,7 @@ compile :
 	$(CC) main.c -o run $(LIBS) $(CFLAGS)
 
 plot :
-	./run; python plot_velocities.py; python plot_positions.py; python plot_hist_x.py; python plot_hist_v.py;
+	python plot_velocities.py; python plot_positions.py; python plot_hist_x.py; python plot_hist_v.py;
 
 clean :
 	rm -rf run; rm -rf *.dat;
