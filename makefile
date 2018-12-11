@@ -1,6 +1,7 @@
 .PHONY : all
 
 all : compile
+other : clean compile velo
 
 CC = gcc
 CFLAGS = -O3 -Wall
@@ -14,3 +15,6 @@ plot :
 
 clean :
 	rm -rf run; rm -rf *.dat;
+
+velo :
+	./run; python plot_velocities.py;

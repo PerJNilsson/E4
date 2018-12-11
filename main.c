@@ -5,9 +5,9 @@
 #include <time.h>
 
 void gaussian_nbr( double guass_var[2]);
-double get_acc(double omega_0, double x);
-void save_x_to_disk(double ** x_pos, int nbr_of_simulations, FILE * positions, double timestep, int nbr_of_particles, double * x_mean, double * x_variance);
-void save_v_to_disk(double ** v_particles, int nbr_of_simulations, FILE * velocities, double timestep, int nbr_of_particles, double * v_mean, double * v_variance);
+double get_acc(double omega_0, double x, double m, double eta, double r_v, double v);
+void save_x_to_disk(double ** x_pos, int nbr_of_simulations, double timestep, int nbr_of_particles, double * x_mean, double * x_variance);
+void save_v_to_disk(double ** v_particles, int nbr_of_simulations, double timestep, int nbr_of_particles, double * v_mean, double * v_variance);
 void get_histogram_values(int j, int i, double tmp_v, double tmp_x);
 void save_histogram_values_to_disk(int avg_loops);
 
@@ -15,18 +15,21 @@ double* v1; double* v2; double* v3; double* v4;
 double* x1; double* x2; double* x3; double* x4;
 int counter1, counter2, counter3, counter4;
 
+double tau;
+double v_th;
+  
 int main() {
 
 
   srand(time(NULL));
   // GSL INITIALIZATION
-	const gsl_rng_type *T;
-	gsl_rng *q;
+  const gsl_rng_type *T;
+  gsl_rng *q;
   // Initializations
   gsl_rng_env_setup();
-	T = gsl_rng_default;
-	q = gsl_rng_alloc(T);
-	gsl_rng_set(q,time(NULL));
+  T = gsl_rng_default;
+  q = gsl_rng_alloc(T);
+  gsl_rng_set(q,time(NULL));
 
   // Declaring variables
   int nbr_of_simulations;
@@ -34,35 +37,33 @@ int main() {
   double timestep;
   double gauss_rv[2];
   double omega_0;
-  FILE * positions;
-  FILE * velocities;
   double radius;
   double density;
   int nbr_of_particles;
-  double tau;
   int avg_loops;
   double start_v;
   double start_x;
   double tmp_v;
   double tmp_a;
   double tmp_x;
+  double r_v;
+  double uni_var1, uni_var2, uni_var3, uni_var4;
   
   // Initializing variable
-  nbr_of_simulations = 30000;
-  timestep = 5*1E-8; // 1e5 and 500 simulations is good for v
+  nbr_of_simulations = 25000;
+  timestep = 5*1.0E-8; // 1e5 and 500 simulations is good for v
   nbr_of_particles = 5;
-  avg_loops = 1000;
+  avg_loops = 5000;
   radius = (2.79*1E-6)/2.0;
   density = 2.65 * 1E3;
-  m = 4.0*M_PI*radius*radius*radius *density*3.0; // assuming particle is sphere-ish
-  printf("mass of particle=%.15f\n",m);
+  m = 4.0*M_PI*radius*radius*radius*density/3.0; // assuming particle is sphere-ish
   temperature = 297;
-  tau = 48.5*1E-6; // 48.5 | 147.3;
-  tau = 147.3*1E-6;
+  tau = 48.5*1E-6;  // A
+  //tau = 147.3*1E-6; // B
   eta = 1.0/tau;
   c_0 = exp(-eta*timestep);
   k_b = 1.380*1E-23;
-  omega_0 = 3000.0;
+  omega_0 = 3000.0*2.0*M_PI;
   v_th = sqrt(k_b*temperature / m);
   start_v = 2*1E-3;
   start_x = 1*1E-7;
@@ -99,15 +100,19 @@ int main() {
     x_pos[i] = j + x_pointer;
     v_particles[i] = j + v_pointer;
   }
-
+  // First initialization of the position, velocities and acceleration
   for (int k=0; k<nbr_of_particles; k++){
+          
+    uni_var1 = gsl_rng_uniform(q);
+    uni_var2 = gsl_rng_uniform(q);
+    r_v  = sqrt( -2.0*log(uni_var1))*cos(M_PI*2*uni_var2);
+      
     x_pos[0][k] = start_x;
     x[k] =  start_x;
     v_particles[0][k] = start_v;
     v[k] =  start_v;
-    a[k] = get_acc(omega_0, x[k]);
+    a[k] = get_acc(omega_0, x[k],m, eta,  r_v, v[k]);
   }
-  double uni_var1, uni_var2;
   // Loop to write a few tradjectories to disk
   for (int i=1; i<nbr_of_simulations; i++){
 
@@ -116,17 +121,20 @@ int main() {
 
       uni_var1 = gsl_rng_uniform(q);
       uni_var2 = gsl_rng_uniform(q);
+      uni_var3 = gsl_rng_uniform(q);
+      uni_var4 = gsl_rng_uniform(q);
 
       // Using Box-Muller
       gauss_rv[0]  = sqrt( -2.0*log(uni_var1))*cos(M_PI*2*uni_var2);
       gauss_rv[1]  = sqrt( -2.0*log(uni_var1))*sin(M_PI*2*uni_var2);
-
-      v[j] = sqrt(c_0)*v[j] + v_th*sqrt(1.0-c_0)*gauss_rv[0];
-      v[j] = v[j] + 0.5*a[j]*timestep;
+      r_v  = sqrt( -2.0*log(uni_var3))*cos(M_PI*2*uni_var4);
+      
+      //v[j] = sqrt(c_0)*v[j] + v_th*sqrt(1.0-c_0)*gauss_rv[0];
+      v[j] = 0.5*a[j]*timestep+sqrt(c_0)*v[j] + v_th*sqrt(1.0-c_0)*gauss_rv[0];
       x[j] = x[j] + v[j]*timestep;
-      a[j] = get_acc(omega_0, x[j]);
-      v[j] = v[j] + 0.5*a[j]*timestep;
-      v[j] = sqrt(c_0)*v[j] + v_th*sqrt(1.0-c_0)*gauss_rv[1];
+      a[j] = get_acc(omega_0, x[j],m, eta,  r_v, v[j]);
+      v[j] = sqrt(c_0)*0.5*a[j]*timestep + sqrt(c_0)*v[j] + v_th*sqrt(1.0-c_0)*gauss_rv[1];
+      //v[j] = sqrt(c_0)*v[j] + v_th*sqrt(1.0-c_0)*gauss_rv[1];
 
       x_pos[i][j] = x[j];
       v_particles[i][j] = v[j];
@@ -135,49 +143,60 @@ int main() {
 
   // Loop to calculate average over several trajectories
   for (int j=0; j<avg_loops; j++){
-    tmp_v = start_v;
-    tmp_x = start_x;
-    tmp_a = get_acc(omega_0, tmp_x);
 
-    v_mean[0] += tmp_v/avg_loops;
-    v_variance[0] += tmp_v*tmp_v/avg_loops;
+          tmp_v = start_v;
+          tmp_x = start_x;
 
-    x_mean[0] += tmp_x / avg_loops;
-    x_variance[0] += tmp_x*tmp_x / avg_loops;
+          uni_var1 = gsl_rng_uniform(q);
+          uni_var2 = gsl_rng_uniform(q);
+          r_v  = sqrt( -2.0*log(uni_var1))*cos(M_PI*2*uni_var2);
+          
+          tmp_a =  get_acc(omega_0, tmp_x, m, eta, r_v,tmp_v);
+          
+          v_mean[0] += tmp_v/avg_loops;
+          v_variance[0] += tmp_v*tmp_v/avg_loops;
+          
+          x_mean[0] += tmp_x / avg_loops;
+          x_variance[0] += tmp_x*tmp_x / avg_loops;
 
-    for (int i=1; i<nbr_of_simulations; i++){
+          for (int i=1; i<nbr_of_simulations; i++){
 
-      // Get two uniform random numbers [0,1]
-      uni_var1 = gsl_rng_uniform(q);
-      uni_var2 = gsl_rng_uniform(q);
+                  // Get four uniform random numbers [0,1]
+                  
+                  uni_var1 = gsl_rng_uniform(q);
+                  uni_var2 = gsl_rng_uniform(q);
+                  uni_var3 = gsl_rng_uniform(q);
+                  uni_var4 = gsl_rng_uniform(q);
 
-      // Using Box-Muller to get 2 gaussian r.v. from unifrom r.v.
-      gauss_rv[0]  = sqrt( -2.0*log(uni_var1))*cos(M_PI*2*uni_var2);
-      gauss_rv[1]  = sqrt( -2.0*log(uni_var1))*sin(M_PI*2*uni_var2);
-
-      tmp_v =  sqrt(c_0)*tmp_v + v_th*sqrt(1.0-c_0)*gauss_rv[0];
-      tmp_v = tmp_v + 0.5*tmp_a*timestep;
-      tmp_x = tmp_x + tmp_v*timestep;
-      tmp_a = get_acc(omega_0, tmp_x);
-      tmp_v = tmp_v + 0.5*tmp_a*timestep;
-      tmp_v = sqrt(c_0)*tmp_v + v_th*sqrt(1.0-c_0)*gauss_rv[1];
-
-      get_histogram_values(j, i,tmp_v, tmp_x);
-
-      v_mean[i]+= tmp_v/avg_loops;
-      v_variance[i] += tmp_v*tmp_v/avg_loops;
-      x_mean[i] += tmp_x / avg_loops;
-      x_variance[i] += tmp_x*tmp_x / avg_loops;
-
-    }
+                  // Using Box-Muller
+                  gauss_rv[0]  = sqrt( -2.0*log(uni_var1))*cos(M_PI*2*uni_var2);
+                  gauss_rv[1]  = sqrt( -2.0*log(uni_var1))*sin(M_PI*2*uni_var2);
+                  r_v  = sqrt( -2.0*log(uni_var3))*cos(M_PI*2*uni_var4);
+                  //tmp_v =  sqrt(c_0)*tmp_v + v_th*sqrt(1.0-c_0)*gauss_rv[0];
+                  tmp_v = 0.5*tmp_a*timestep + sqrt(c_0)*tmp_v + v_th*sqrt(1.0-c_0)*gauss_rv[0];
+                  tmp_x = tmp_x + tmp_v*timestep;
+                  tmp_a =  get_acc(omega_0, tmp_x,m, eta,  r_v, tmp_v);
+                  tmp_v = sqrt(c_0)*0.5*tmp_a*timestep + sqrt(c_0)*tmp_v + v_th*sqrt(1.0-c_0)*gauss_rv[1];
+                  //tmp_v = sqrt(c_0)*tmp_v + v_th*sqrt(1.0-c_0)*gauss_rv[1];
+                  
+                  get_histogram_values(j, i,tmp_v, tmp_x);
+                  
+                  v_mean[i]+= tmp_v/avg_loops;
+                  v_variance[i] += tmp_v*tmp_v/avg_loops;
+                  x_mean[i] += tmp_x / avg_loops;
+                  x_variance[i] += tmp_x*tmp_x / avg_loops;
+                  
+          }
   }
   for (int i=0; i<nbr_of_simulations; i++){
-    v_variance[i] = sqrt(v_variance[i] - v_mean[i]*v_mean[i]);
-    x_variance[i] = sqrt(x_variance[i] - x_mean[i]*x_mean[i]);
+          v_variance[i] = sqrt(v_variance[i] - v_mean[i]*v_mean[i]); // std
+          x_variance[i] = sqrt(x_variance[i] - x_mean[i]*x_mean[i]); // std
   }
 
-  save_x_to_disk(x_pos, nbr_of_simulations, positions, timestep, nbr_of_particles, x_mean, x_variance);
-  save_v_to_disk(v_particles, nbr_of_simulations, velocities, timestep, nbr_of_particles, v_mean, v_variance);
+  save_x_to_disk(x_pos, nbr_of_simulations, timestep, nbr_of_particles, x_mean, x_variance);
+
+  save_v_to_disk(v_particles, nbr_of_simulations, timestep, nbr_of_particles, v_mean, v_variance);
+
   save_histogram_values_to_disk(avg_loops);
 
   return 0;
@@ -185,10 +204,12 @@ int main() {
 
 
 
-double get_acc(double omega_0, double x){
+double get_acc(double omega_0, double x, double m, double eta, double r_v, double v){
   // F = -kx  = -m omega² x = m *a --> a = - omega² * x
   double a;
-  a = -omega_0*omega_0 * x;
+  double f;
+  f = -m*omega_0*omega_0*x - m*eta*v + m*r_v;
+  a = f / m;
   return a;
 }
 
@@ -204,34 +225,37 @@ void gaussian_nbr(double * gauss_rv){
   gauss_rv[1]  = sqrt( -2.0*log(uni_var1))*sin(M_PI*2*uni_var2);
 }
 
-void save_x_to_disk(double ** x_pos, int nbr_of_simulations, FILE * positions, double timestep, int nbr_of_particles, double * x_mean, double * x_variance){
-  double nm = 1E9; // save in nano meter
-  positions = fopen("pos.dat", "w");
-  double time_save;
-  for (int i=0; i<nbr_of_simulations; i++){
-    time_save = timestep*i*1E3;
-    fprintf(positions, "%f \t",time_save);
-    for (int j=0; j<nbr_of_particles; j++){
-      fprintf(positions, "%f \t",x_pos[i][j]*nm);
-    }
-    fprintf(positions, "%f \t %f \t %f \t \n", x_mean[i]*nm, (x_mean[i]-x_variance[i])*nm, (x_mean[i]+x_variance[i])*nm);
-  }
-  fclose(positions);
+void save_x_to_disk(double ** x_pos, int nbr_of_simulations,  double timestep, int nbr_of_particles, double * x_mean, double * x_variance){
+        FILE * positions;
+        double nm = 1E9; // save in nano meter
+        double ms = 1E3; // save timestep ms
+        positions = fopen("pos.dat", "w");
+        double time_save;
+        for (int i=0; i<nbr_of_simulations; i++){
+                time_save = timestep*i*ms;
+                fprintf(positions, "%e \t",time_save);
+                for (int j=0; j<nbr_of_particles; j++){
+                        fprintf(positions, "%e \t",x_pos[i][j]*nm);
+                }
+                fprintf(positions, "%e \t %e \t %e \t \n", x_mean[i]*nm, (x_mean[i]-x_variance[i])*nm, (x_mean[i]+x_variance[i])*nm);
+        }
+        fclose(positions);
 }
 
-void save_v_to_disk(double ** v_particles, int nbr_of_simulations, FILE * velocities, double timestep, int nbr_of_particles, double *v_mean, double * v_variance){
-  double ms = 1E3; // save in millisecond
-  velocities = fopen("velocities.dat", "w");
-  double time_save;
-  for (int i=0; i<nbr_of_simulations; i++){
-    time_save = timestep*i*ms;
-    fprintf(velocities, "%f \t ",time_save);
-    for (int j=0; j<nbr_of_particles; j++){
-      fprintf(velocities, "%f \t ",v_particles[i][j]*ms);
-    }
-    fprintf(velocities, "%f \t %f \t %f \t \n", v_mean[i]*ms, (v_mean[i]-v_variance[i])*ms, (v_mean[i]+v_variance[i])*ms);
-  }
-    fclose(velocities);
+void save_v_to_disk(double ** v_particles, int nbr_of_simulations,  double timestep, int nbr_of_particles, double *v_mean, double * v_variance){
+        FILE * velocities;
+        double ms = 1E3; // save in millisecond
+        velocities = fopen("velocities.dat", "w");
+        double time_save;
+        for (int i=0; i<nbr_of_simulations; i++){
+                time_save = timestep*i*ms;
+                fprintf(velocities, "%e \t ",time_save);
+                for (int j=0; j<nbr_of_particles; j++){
+                        fprintf(velocities, "%e \t ",v_particles[i][j]*ms);
+                }
+                fprintf(velocities, "%e \t %e \t %e \t \n", v_mean[i]*ms, (v_mean[i]-v_variance[i])*ms, (v_mean[i]+v_variance[i])*ms);
+        }
+        fclose(velocities);
 }
 
 void get_histogram_values(int j, int i, double tmp_v, double tmp_x){
