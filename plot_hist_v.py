@@ -40,24 +40,32 @@ plt.title('Historgram of velocities of a Brownian particle with repect to time')
 
 # display the plot
 
-"""
-timestep = scale * 1E-3
+
+timestep = time[0]*1E-3/scale
 radius = (2.79*1E-6)/2.0;
 density = 2.65 * 1E3;
-m = 4.0*math.pi*radius*radius*radius *density*3.0; # assuming particle is sphere-ish
+m = 4.0*math.pi*radius*radius*radius *density/3.0; 
 temperature = 297;
 tau = 147.3*1E-6; # 48.5 | 147.3;
 eta = 1.0/tau;
-c_0 = math.exp(-2*eta*timestep);
+c_0 = 1.0-math.exp(-2*eta*timestep);
 c_1 = math.exp(-eta*timestep);
-
 k_b = 1.380*1E-23;
 v0 = 2*1E-3
-"""
+plotter = []
+for i in range(0, len(data[:,0])):
+    v = data[i,0]*1E-3
+    a = np.sqrt(m / (2*np.pi*k_b*temperature*c_0));
+    b = np.exp( -(m*(v-v0*c_1)**2)/(2*k_b*temperature*c_0));
+    plotter.append(a*b)
+
+plt.plot(plotter)
 (mu4, sigma4)  = norm.fit(data[:,3])
 (mu3, sigma3)  = norm.fit(data[:,2])
 (mu2, sigma2)  = norm.fit(data[:,1])
 (mu1, sigma1)  = norm.fit(data[:,0])
+
+print(mu4, sigma4)
 
 x = np.linspace(mu1 - 3*sigma1, mu1 + 3*sigma1, 100)
 plt.plot(x,mlab.normpdf(x, mu1, sigma1), '--', color='Black', linewidth=3)

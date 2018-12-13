@@ -17,6 +17,8 @@ int counter1, counter2, counter3, counter4;
 
 double tau;
 double v_th;
+double m, temperature, k_b, c_0, eta;
+double timestep;
   
 int main() {
 
@@ -33,8 +35,6 @@ int main() {
 
   // Declaring variables
   int nbr_of_simulations;
-  double v_th, m, temperature, k_b, c_0, eta;
-  double timestep;
   double gauss_rv[2];
   double omega_0;
   double radius;
@@ -53,7 +53,7 @@ int main() {
   nbr_of_simulations = 25000;
   timestep = 5*1.0E-8; // 1e5 and 500 simulations is good for v
   nbr_of_particles = 5;
-  avg_loops = 5000;
+  avg_loops = 500;
   radius = (2.79*1E-6)/2.0;
   density = 2.65 * 1E3;
   m = 4.0*M_PI*radius*radius*radius*density/3.0; // assuming particle is sphere-ish
@@ -71,7 +71,7 @@ int main() {
   counter2=0;
   counter3=0;
   counter4=0;
-
+  printf("%e\n", m);
   FILE * scale;
   scale = fopen("scale.dat", "w");
   fprintf(scale, "%f", timestep*1E3);
@@ -208,7 +208,7 @@ double get_acc(double omega_0, double x, double m, double eta, double r_v, doubl
   // F = -kx  = -m omega² x = m *a --> a = - omega² * x
   double a;
   double f;
-  f = -m*omega_0*omega_0*x - m*eta*v + m*r_v;
+  f = -m*omega_0*omega_0*x - m*eta*v + sqrt(2*eta*k_b*temperature/ m / timestep)*r_v;
   a = f / m;
   return a;
 }
