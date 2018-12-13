@@ -23,7 +23,7 @@ for i in range(0, 4):
     plt.hist(data[:,i], bins=50, density=True, alpha=0.7, rwidth=0.85, label='Time [ms]:'+ str(round(time[i],5)))
 
 # labels
-plt.xlabel('Velocities / [mm/s]', fontsize=20)
+plt.xlabel('Velocities / [m/s]', fontsize=20)
 plt.ylabel(' #trajectories', fontsize=20)
 
 # legend
@@ -40,32 +40,42 @@ plt.title('Historgram of velocities of a Brownian particle with repect to time')
 
 # display the plot
 
-
-timestep = time[0]*1E-3/scale
+ms = 1E-3;
+timestep = time[0]*ms/scale
 radius = (2.79*1E-6)/2.0;
 density = 2.65 * 1E3;
-m = 4.0*math.pi*radius*radius*radius *density/3.0; 
+m = 4.0*math.pi*radius*radius*radius *density/3.0;
 temperature = 297;
-tau = 147.3*1E-6; # 48.5 | 147.3;
+tau = 48.5*1E-6; # 48.5 | 147.3;
+#tau = 147.3*1E-6; # 48.5 | 147.3;
 eta = 1.0/tau;
-c_0 = 1.0-math.exp(-2*eta*timestep);
-c_1 = math.exp(-eta*timestep);
-k_b = 1.380*1E-23;
+c_0 = 1.0-math.exp(-2*eta*timestep)
+c_1 = math.exp(-eta*timestep)
+k_b = 1.380*1E-23
+
 v0 = 2*1E-3
 plotter = []
+
+nbrIt = 25000;
+sigma = np.sqrt(k_b*temperature / m / 2); 
+# Stationary solution
+v = np.linspace(-1*ms, 1*ms, nbrIt); # In miliseconds
+for i in range(0, nbrIt):
+    a = np.sqrt(1.0 / (2*np.pi*sigma **2));
+    b = np.exp( -((v[i])**2)/(2*sigma**2));
+    plotter.append(a*b)
+
+"""
 for i in range(0, len(data[:,0])):
-    v = data[i,0]*1E-3
     a = np.sqrt(m / (2*np.pi*k_b*temperature*c_0));
     b = np.exp( -(m*(v-v0*c_1)**2)/(2*k_b*temperature*c_0));
     plotter.append(a*b)
-
-plt.plot(plotter)
+"""
 (mu4, sigma4)  = norm.fit(data[:,3])
 (mu3, sigma3)  = norm.fit(data[:,2])
 (mu2, sigma2)  = norm.fit(data[:,1])
 (mu1, sigma1)  = norm.fit(data[:,0])
 
-print(mu4, sigma4)
 
 x = np.linspace(mu1 - 3*sigma1, mu1 + 3*sigma1, 100)
 plt.plot(x,mlab.normpdf(x, mu1, sigma1), '--', color='Black', linewidth=3)
@@ -75,5 +85,7 @@ x2 = np.linspace(mu3 - 3*sigma3, mu3 + 3*sigma3, 100)
 plt.plot(x2,mlab.normpdf(x2, mu3, sigma3), '--', color='Black', linewidth=3)
 x3 = np.linspace(mu4 - 3*sigma4, mu4 + 3*sigma4, 100)
 plt.plot(x3,mlab.normpdf(x3, mu4, sigma4), '--', color='Black', linewidth=3)
+
+plt.plot(v, plotter, 'r-', linewidth=3.0)
 
 plt.show()

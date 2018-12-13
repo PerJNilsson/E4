@@ -48,10 +48,11 @@ int main() {
   double tmp_x;
   double r_v;
   double uni_var1, uni_var2, uni_var3, uni_var4;
+  double sigma; 
   
   // Initializing variable
   nbr_of_simulations = 25000;
-  timestep = 5*1.0E-8; // 1e5 and 500 simulations is good for v
+  timestep = 5*1.0E-6; // 1e5 and 500 simulations is good for v
   nbr_of_particles = 5;
   avg_loops = 500;
   radius = (2.79*1E-6)/2.0;
@@ -59,7 +60,7 @@ int main() {
   m = 4.0*M_PI*radius*radius*radius*density/3.0; // assuming particle is sphere-ish
   temperature = 297;
   tau = 48.5*1E-6;  // A
-  //tau = 147.3*1E-6; // B
+  //  tau = 147.3*1E-6; // B
   eta = 1.0/tau;
   c_0 = exp(-eta*timestep);
   k_b = 1.380*1E-23;
@@ -71,7 +72,8 @@ int main() {
   counter2=0;
   counter3=0;
   counter4=0;
-  printf("%e\n", m);
+  sigma = sqrt(2* eta * k_b * temperature / m);
+
   FILE * scale;
   scale = fopen("scale.dat", "w");
   fprintf(scale, "%f", timestep*1E3);
@@ -106,7 +108,8 @@ int main() {
     uni_var1 = gsl_rng_uniform(q);
     uni_var2 = gsl_rng_uniform(q);
     r_v  = sqrt( -2.0*log(uni_var1))*cos(M_PI*2*uni_var2);
-      
+    r_v = r_v * sigma;
+
     x_pos[0][k] = start_x;
     x[k] =  start_x;
     v_particles[0][k] = start_v;
@@ -126,9 +129,9 @@ int main() {
 
       // Using Box-Muller
       gauss_rv[0]  = sqrt( -2.0*log(uni_var1))*cos(M_PI*2*uni_var2);
-      gauss_rv[1]  = sqrt( -2.0*log(uni_var1))*sin(M_PI*2*uni_var2);
+      gauss_rv[1]  = sqrt( -2.0*log(uni_var1))*sin(M_PI*2*uni_var2);  
       r_v  = sqrt( -2.0*log(uni_var3))*cos(M_PI*2*uni_var4);
-      
+      r_v = r_v * sigma; // Change from unit variance to sigma² variance
       //v[j] = sqrt(c_0)*v[j] + v_th*sqrt(1.0-c_0)*gauss_rv[0];
       v[j] = 0.5*a[j]*timestep+sqrt(c_0)*v[j] + v_th*sqrt(1.0-c_0)*gauss_rv[0];
       x[j] = x[j] + v[j]*timestep;
@@ -150,7 +153,8 @@ int main() {
           uni_var1 = gsl_rng_uniform(q);
           uni_var2 = gsl_rng_uniform(q);
           r_v  = sqrt( -2.0*log(uni_var1))*cos(M_PI*2*uni_var2);
-          
+          r_v = r_v * sigma;
+
           tmp_a =  get_acc(omega_0, tmp_x, m, eta, r_v,tmp_v);
           
           v_mean[0] += tmp_v/avg_loops;
@@ -172,6 +176,8 @@ int main() {
                   gauss_rv[0]  = sqrt( -2.0*log(uni_var1))*cos(M_PI*2*uni_var2);
                   gauss_rv[1]  = sqrt( -2.0*log(uni_var1))*sin(M_PI*2*uni_var2);
                   r_v  = sqrt( -2.0*log(uni_var3))*cos(M_PI*2*uni_var4);
+                  r_v = r_v * sigma;
+
                   //tmp_v =  sqrt(c_0)*tmp_v + v_th*sqrt(1.0-c_0)*gauss_rv[0];
                   tmp_v = 0.5*tmp_a*timestep + sqrt(c_0)*tmp_v + v_th*sqrt(1.0-c_0)*gauss_rv[0];
                   tmp_x = tmp_x + tmp_v*timestep;
@@ -208,7 +214,7 @@ double get_acc(double omega_0, double x, double m, double eta, double r_v, doubl
   // F = -kx  = -m omega² x = m *a --> a = - omega² * x
   double a;
   double f;
-  f = -m*omega_0*omega_0*x - m*eta*v + sqrt(2*eta*k_b*temperature/ m / timestep)*r_v;
+  f = -m*omega_0*omega_0*x - m*eta*v + m*r_v;
   a = f / m;
   return a;
 }
@@ -260,8 +266,8 @@ void save_v_to_disk(double ** v_particles, int nbr_of_simulations,  double times
 
 void get_histogram_values(int j, int i, double tmp_v, double tmp_x){
   int t_sample[4] = {1000, 2000, 5000, 20000};
-  double ms = 1E3;
-  double nm = 1E9;
+  double ms = 1; //1E3;
+  double nm = 1;//1E9;
   if (i == t_sample[0]) {
     v1[counter1] = tmp_v*ms;
     x1[counter1] = tmp_x*nm;
@@ -293,7 +299,7 @@ void save_histogram_values_to_disk(int avg_loops){
   v_hist = fopen("v_hist.dat", "w");
 
   for (int i=0; i<avg_loops; i++){
-    fprintf(x_hist, "%f \t %f \t %f \t %f\n", x1[i], x2[i], x3[i], x4[i]);
+    fprintf(x_hist, "%e \t %e \t %e \t %e\n", x1[i], x2[i], x3[i], x4[i]);
     fprintf(v_hist, "%f \t %f \t %f \t %f\n", v1[i], v2[i], v3[i], v4[i]);
   }
 }
